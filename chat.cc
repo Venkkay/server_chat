@@ -554,22 +554,22 @@ void ChatServer::run(const uint32_t addr, const uint16_t port)
                     }
                     else if (!input.empty()){
                         //buffer[bytes_read] = '\0';
-                        std::cout << "Send: " << input << std::endl;
+                        // std::cout << "Send: " << input << std::endl;
                         //send(_client.fd(), input.c_str(), input.size(), 0);
-                        /*
-                        for (Socket client : _clients) {
-                            printf("%d\n", client.fd());
-                        }
-                        */
-                        /*
-                        for (Socket client : _clients) {
-                            client.send(input);
-                        }
-                        */
                         //_client.send(input);
                         input.append("\r\n");
                         for (auto& client : _clients) {
-                            sendMsgToClient(client, input);
+                            try {
+                                client.send(input);
+                            } catch (const std::exception& e) {
+                                printf("%s", e.what());
+                                _pollfds.erase(std::remove_if(_pollfds.begin(), _pollfds.end(),[&client](const pollfd& pfd) {
+                                        return pfd.fd == client.fd();
+                                    }), _pollfds.end());
+                                _clients.remove_if([&client](const Socket& c) {
+                                    return c.fd() == client.fd();
+                                });
+                            }
                         }
                     }
                 }
@@ -591,7 +591,7 @@ void ChatServer::run(const uint32_t addr, const uint16_t port)
                         --i;
                     } else {
                         // Traiter et répondre au client
-                        buffer[bytes_read] = '\0';
+                        buffer[bytes_read-1] = '\0';
                         std::cout << "Message from client " << _pollfds[i].fd << ": " << buffer << std::endl;
 
                         //send(pollfds[i].fd, "Message received\n", 17, 0);
