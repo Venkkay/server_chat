@@ -28,6 +28,7 @@
 #include <array>
 #include <string>
 #include <memory>
+#include <utility>
 #include <vector>
 #include <thread>
 #include <iostream>
@@ -35,6 +36,7 @@
 #include "chat.h"
 
 #include <algorithm>
+#include <sstream>
 
 // ---------------------------------------------------------------------------
 // posix::signal_traits
@@ -295,6 +297,8 @@ Socket::Socket()
 
 Socket::Socket(const int fd)
     : _fd(fd)
+    , _sent_msg_count(0)
+    , _receive_msg_count(0)
 {
 }
 
@@ -324,6 +328,19 @@ void Socket::create()
 void Socket::set_fd(const int fd)
 {
     _fd = fd;
+}
+
+void Socket::set_name(std::string name)
+{
+    _name = std::move(name);
+}
+
+void Socket::increase_sent_msg_count() {
+    _sent_msg_count += 1;
+}
+
+void Socket::increase_receive_msg_count() {
+    _receive_msg_count += 1;
 }
 
 void Socket::close()
@@ -506,6 +523,7 @@ void ChatServer::run(const uint32_t addr, const uint16_t port)
 {
     std::cout << "ChatServer::run()" << std::endl;
     //std::s
+    _server.set_name("Server");
     _server.create();
     _server.set_reuseaddr(true);
     _server.bind(addr, port);
@@ -534,11 +552,16 @@ void ChatServer::run(const uint32_t addr, const uint16_t port)
                     int client_fd = _server.accept();
                     //Socket client(client_fd);
                     _clients.emplace_back(client_fd);
+                    Socket& new_client = _clients.back();
 
                     std::cout << "New client connected: " << client_fd << std::endl;
 
                     // Ajouter le client à la liste
                     _pollfds.push_back({client_fd, POLLIN, 0});
+
+                    sendMsgToClient(new_client, "Entrez un nom ou un identifiant: ");
+                    _server.increase_sent_msg_count();
+                    new_client.increase_receive_msg_count();
                 }
                 else if (_pollfds[i].fd == STDIN_FILENO) {
                     //char buffer[1024];
@@ -549,14 +572,34 @@ void ChatServer::run(const uint32_t addr, const uint16_t port)
                         std::cout << "Error reading from stdin" << std::endl;
                         continue;
                     }
+
+                    std::string command;
+                    std::string first_param;
+                    std::string text;
+
+                    splitCommand(input, command, first_param, text);
+                    auto searched_client_iterator = std::find_if(_clients.begin(), _clients.end(), [first_param](const Socket& client) {
+                            return client.name() == first_param;
+                        });
+
                     if (input == "quit") {
                         quit();
                     }
+                    else if (command == "send" && searched_client_iterator != _clients.end()) {
+                        auto& searched_client = *searched_client_iterator;
+                        text.append("\r\n");
+                        sendMsgToClient(searched_client, text);
+                    }
+                    else if (command == "send" && first_param == "all") {
+                        text.append("\r\n");
+                        for (auto& client : _clients) {
+                            sendMsgToClient(client, text);
+                        }
+                    }
+                    else if (command == "send") {
+                        std::cout << "Error in the command 'send' : " << input <<  std::endl;
+                    }
                     else if (!input.empty()){
-                        //buffer[bytes_read] = '\0';
-                        // std::cout << "Send: " << input << std::endl;
-                        //send(_client.fd(), input.c_str(), input.size(), 0);
-                        //_client.send(input);
                         input.append("\r\n");
                         for (auto& client : _clients) {
                             sendMsgToClient(client, input);
@@ -580,9 +623,28 @@ void ChatServer::run(const uint32_t addr, const uint16_t port)
                         }
                         --i;
                     } else {
-                        // Traiter et répondre au client
                         buffer[bytes_read-1] = '\0';
-                        std::cout << "Message from client " << _pollfds[i].fd << ": " << buffer << std::endl;
+                        std::string text = buffer;
+                        int current_fd = _pollfds[i].fd;
+                        // Traiter et répondre au client
+                        auto current_client_iterator = std::find_if(_clients.begin(), _clients.end(), [current_fd](const Socket& client) {
+                            return client.fd() == current_fd;
+                        });
+                        if (current_client_iterator != _clients.end()) {
+                            auto& current_client = *current_client_iterator;
+                            if (current_client.sent_msg_count() == 0) {
+                                std::replace(text.begin(), text.end(), ' ', '_');
+                                current_client.set_name(text);
+                                std::cout << "Name for client " << _pollfds[i].fd << ": " << text << std::endl;
+                            }
+                            else {
+                                std::cout << "Message from " << current_client.name() << "/" << _pollfds[i].fd << ": " << text << std::endl;
+                            }
+                            current_client.increase_sent_msg_count();
+                        }
+                        else {
+
+                        }
 
                         //send(pollfds[i].fd, "Message received\n", 17, 0);
                     }
@@ -591,6 +653,18 @@ void ChatServer::run(const uint32_t addr, const uint16_t port)
         }
     }
 
+}
+
+void ChatServer::splitCommand(const std::string& input, std::string& first, std::string& second, std::string& rest) {
+    std::istringstream iss(input);
+
+    if (!(iss >> first)) first = "";  // Récupère le premier mot
+    if (!(iss >> second)) second = ""; // Récupère le deuxième mot
+
+    std::getline(iss, rest); // Récupère le reste de la ligne
+    if (!rest.empty() && rest[0] == ' ') {
+        rest.erase(0, 1); // Supprime l'espace initial si nécessaire
+    }
 }
 
 
@@ -610,6 +684,8 @@ void ChatServer::quit()
 void ChatServer::sendMsgToClient(Socket& client, std::string msg) {
     try {
         client.send(msg);
+        client.increase_receive_msg_count();
+        _server.increase_sent_msg_count();
     } catch (const std::exception& e) {
         printf("%s", e.what());
         _pollfds.erase(std::remove_if(_pollfds.begin(), _pollfds.end(),[&client](const pollfd& pfd) {

@@ -316,6 +316,21 @@ public:
         return _fd;
     }
 
+    std::string name() const
+    {
+        return _name;
+    }
+
+    int sent_msg_count() const
+    {
+        return _sent_msg_count;
+    }
+
+    int receive_msg_count() const
+    {
+        return _receive_msg_count;
+    }
+
     void reset(const int fd)
     {
         _fd = (close(), fd);
@@ -324,6 +339,12 @@ public:
     void create();
 
     void set_fd(int fd);
+
+    void set_name(std::string name);
+
+    void increase_sent_msg_count();
+
+    void increase_receive_msg_count();
 
     void close();
 
@@ -357,6 +378,9 @@ public:
 
 protected:
     int _fd;
+    std::string _name;
+    int _sent_msg_count;
+    int _receive_msg_count;
 };
 
 // ---------------------------------------------------------------------------
@@ -372,6 +396,8 @@ public:
     virtual ~ChatServer() = default;
 
     void run(const uint32_t addr, const uint16_t port);
+
+    void splitCommand(const std::string &input, std::string &first, std::string &second, std::string &rest);
 
 protected:
     virtual void onSigHgup() override;
