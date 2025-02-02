@@ -532,7 +532,6 @@ void ChatServer::run(const uint32_t addr, const uint16_t port)
                 // Nouveau client en attente de connexion
                 if (_pollfds[i].fd == _server.fd()) {
                     int client_fd = _server.accept();
-                    //Socket client(client_fd);
                     _clients.emplace_back(client_fd);
 
                     std::cout << "New client connected: " << client_fd << std::endl;
@@ -541,10 +540,7 @@ void ChatServer::run(const uint32_t addr, const uint16_t port)
                     _pollfds.push_back({client_fd, POLLIN, 0});
                 }
                 else if (_pollfds[i].fd == STDIN_FILENO) {
-                    //char buffer[1024];
                     std::string input;
-                    //int bytes_read = read(STDIN_FILENO, buffer, sizeof(buffer) - 1);
-                    // ;
                     if (!std::getline(std::cin, input)) {
                         std::cout << "Error reading from stdin" << std::endl;
                         continue;
@@ -553,10 +549,6 @@ void ChatServer::run(const uint32_t addr, const uint16_t port)
                         quit();
                     }
                     else if (!input.empty()){
-                        //buffer[bytes_read] = '\0';
-                        // std::cout << "Send: " << input << std::endl;
-                        //send(_client.fd(), input.c_str(), input.size(), 0);
-                        //_client.send(input);
                         input.append("\r\n");
                         for (auto& client : _clients) {
                             sendMsgToClient(client, input);
@@ -583,8 +575,6 @@ void ChatServer::run(const uint32_t addr, const uint16_t port)
                         // Traiter et répondre au client
                         buffer[bytes_read-1] = '\0';
                         std::cout << "Message from client " << _pollfds[i].fd << ": " << buffer << std::endl;
-
-                        //send(pollfds[i].fd, "Message received\n", 17, 0);
                     }
                 }
             }
