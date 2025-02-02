@@ -559,17 +559,7 @@ void ChatServer::run(const uint32_t addr, const uint16_t port)
                         //_client.send(input);
                         input.append("\r\n");
                         for (auto& client : _clients) {
-                            try {
-                                client.send(input);
-                            } catch (const std::exception& e) {
-                                printf("%s", e.what());
-                                _pollfds.erase(std::remove_if(_pollfds.begin(), _pollfds.end(),[&client](const pollfd& pfd) {
-                                        return pfd.fd == client.fd();
-                                    }), _pollfds.end());
-                                _clients.remove_if([&client](const Socket& c) {
-                                    return c.fd() == client.fd();
-                                });
-                            }
+                            sendMsgToClient(client, input);
                         }
                     }
                 }
@@ -617,7 +607,7 @@ void ChatServer::quit()
     _quit = true;
 }
 
-void ChatServer::sendMsgToClient(Socket client, std::string msg) {
+void ChatServer::sendMsgToClient(Socket& client, std::string msg) {
     try {
         client.send(msg);
     } catch (const std::exception& e) {

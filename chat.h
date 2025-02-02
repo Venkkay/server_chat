@@ -395,7 +395,7 @@ private:
 
     void quit();
 
-    void sendMsgToClient(Socket client, std::string msg);
+    void sendMsgToClient(Socket &client, std::string msg);
 
 private:
     SignalManager _signal_manager;
