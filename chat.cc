@@ -550,7 +550,6 @@ void ChatServer::run(const uint32_t addr, const uint16_t port)
                 // Nouveau client en attente de connexion
                 if (_pollfds[i].fd == _server.fd()) {
                     int client_fd = _server.accept();
-                    //Socket client(client_fd);
                     _clients.emplace_back(client_fd);
                     Socket& new_client = _clients.back();
 
@@ -564,10 +563,7 @@ void ChatServer::run(const uint32_t addr, const uint16_t port)
                     new_client.increase_receive_msg_count();
                 }
                 else if (_pollfds[i].fd == STDIN_FILENO) {
-                    //char buffer[1024];
                     std::string input;
-                    //int bytes_read = read(STDIN_FILENO, buffer, sizeof(buffer) - 1);
-                    // ;
                     if (!std::getline(std::cin, input)) {
                         std::cout << "Error reading from stdin" << std::endl;
                         continue;
@@ -645,8 +641,6 @@ void ChatServer::run(const uint32_t addr, const uint16_t port)
                         else {
 
                         }
-
-                        //send(pollfds[i].fd, "Message received\n", 17, 0);
                     }
                 }
             }
